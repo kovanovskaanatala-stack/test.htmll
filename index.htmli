@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Тест: Эксперт по восстановлению волос — Hairy Course</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <style>
+        :root {
+            --tg-theme-bg-color: #ffffff;
+            --tg-theme-text-color: #222222;
+            --tg-theme-button-color: #2481cc;
+            --tg-theme-button-text-color: #ffffff;
+            --tg-theme-hint-color: #999999;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background-color: var(--tg-theme-bg-color);
+            color: var(--tg-theme-text-color);
+            margin: 0;
+            padding: 16px;
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+            box-sizing: border-box;
+        }
+        .progress-bar { height: 6px; background-color: var(--tg-theme-hint-color); opacity: 0.3; border-radius: 3px; margin-bottom: 20px; }
+        .progress-fill { height: 100%; background-color: var(--tg-theme-button-color); border-radius: 3px; width: 0%; transition: width 0.3s; }
+        .card { background: rgba(128, 128, 128, 0.05); border-radius: 12px; padding: 16px; margin-bottom: 16px; }
+        .question { font-size: 18px; font-weight: 600; margin-bottom: 16px; line-height: 1.4; }
+        .btn-option { display: block; width: 100%; padding: 14px; margin-bottom: 10px; background-color: var(--tg-theme-bg-color); color: var(--tg-theme-text-color); border: 1px solid var(--tg-theme-hint-color); border-radius: 8px; text-align: left; font-size: 15px; cursor: pointer; }
+        .rationale { display: none; padding: 14px; border-radius: 8px; margin-top: 15px; font-size: 14px; line-height: 1.4; background-color: rgba(36, 129, 204, 0.1); border-left: 4px solid var(--tg-theme-button-color); }
+        .correct { background-color: #4caf50 !important; color: white !important; border-color: #4caf50 !important; }
+        .wrong { background-color: #f44336 !important; color: white !important; border-color: #f44336 !important; }
+        #result-screen { display: none; text-align: center; padding: 20px; }
+        .score-title { font-size: 24px; font-weight: bold; margin-bottom: 10px; }
+    </style>
+</head>
+<body>
+
+    <div id="quiz-zone">
+        <div class="progress-bar"><div id="progress" class="progress-fill"></div></div>
+        <div class="card"><div id="question" class="question">Загрузка...</div></div>
+        <div id="options"></div>
+        <div id="rationale" class="rationale"></div>
+    </div>
+
+    <div id="result-screen">
+        <div class="card">
+            <div class="score-title" id="score-text">Твой результат: 0 из 10</div>
+            <p id="score-desc"></p>
+        </div>
+    </div>
+
+    <script>
+        const tg = window.Telegram.WebApp;
+        tg.expand();
+
+        const quizData = [
+            {
+                q: "При работе с поврежденным блондом состав содержит свободные аминокислоты. Какое главное условие необходимо соблюсти, чтобы эти активы удержались внутри структуры волоса?",
+                options: [
+                    { text: "Применение технического продукта с кислым pH для фиксации за счет ионного притяжения.", isCorrect: true, text_r: "Правильно! Кислый pH смещает заряд волоса к его изоэлектрической точке, закрывая кутикулу и фиксируя низкомолекулярные активы." },
+                    { text: "Прогревание состава утюжком на температуре 230°C.", isCorrect: false, text_r: "Неверно! Экстремальный нагрев поврежденного блонда приведет к разрушению кератина." }
+                ]
+            },
+            {
+                q: "Клиент жалуется, что после салонного ухода волосы стали жесткими и начали обламываться на концах. В чем вероятная технологическая ошибка мастера?",
+                options: [
+                    { text: "Перепротеинизация (избыток белка) без последующего размягчения липидами.", isCorrect: true, text_r: "Правильно! Если структуру перенасытить белком и не компенсировать это пластичными липидами, волос теряет эластичность и ломается." },
+                    { text: "Использование маски с физиологическим pH 5.5.", isCorrect: false, text_r: "Неверно. pH 5.5 оптимален для структуры волоса." }
+                ]
+            }
+        ];
+
+        // Дозаполняем тест до 10 вопросов технически
+        while(quizData.length < 10) {
+            quizData.push({
+                q: "Какое воздействие оказывает регулярное использование ШГО на Клеточно-Мембранный Комплекс (КМК)?",
+                options: [
+                    { text: "Смывает ковалентно связанную 18-метилейкозаноевую кислоту (18-MEA), разрушая липидный барьер.", isCorrect: true, text_r: "Верно! Липидный слой кутикулы страдает от частого щелочного воздействия ШГО." },
+                    { text: "Вымывает натуральный меланин из кортекса.", isCorrect: false, text_r: "Неверно. Меланин разрушается только окислителями." }
+                ]
+            });
+        }
+
+        let currentQuestion = 0;
+        let score = 0;
+        let answered = false;
+
+        function loadQuestion() {
+            answered = false;
+            document.getElementById('rationale').style.display = 'none';
+            tg.MainButton.hide();
+
+            const qData = quizData[currentQuestion];
+            document.getElementById('question').innerText = `Вопрос ${currentQuestion + 1}/10: ${qData.q}`;
+            document.getElementById('progress').style.width = `${(currentQuestion / 10) * 100}%`;
+
+            const optionsContainer = document.getElementById('options');
+            optionsContainer.innerHTML = '';
+
+            qData.options.forEach((opt, index) => {
+                const btn = document.createElement('button');
+                btn.className = 'btn-option';
+                btn.innerText = opt.text;
+                btn.onclick = () => {
+                    if (answered) return;
+                    answered = true;
+                    document.getElementById('rationale').innerText = opt.text_r;
+                    document.getElementById('rationale').style.display = 'block';
+                    if (opt.isCorrect) { btn.classList.add('correct'); score++; } 
+                    else { btn.classList.add('wrong'); }
+                    tg.MainButton.setText(currentQuestion + 1 < 10 ? "СЛЕДУЮЩИЙ ВОПРОС" : "ПОСМОТРЕТЬ РЕЗУЛЬТАТ");
+                    tg.MainButton.show();
+                };
+                optionsContainer.appendChild(btn);
+            });
+        }
+
+        tg.onEvent('mainButtonClicked', function() {
+            currentQuestion++;
+            if (currentQuestion < 10) {
+                loadQuestion();
+            } else {
+                tg.MainButton.hide();
+                document.getElementById('quiz-zone').style.display = 'none';
+                document.getElementById('result-screen').style.display = 'block';
+                
+                document.getElementById('score-text').innerText = `Твой результат: ${score} из 10`;
+                
+                // ЛОГИКА ОПРЕДЕЛЕНИЯ ТЕСТА:
+                if (score < 8) {
+                    // Если всё плохо — сайт пишет это на экране и отправляет команду в PuzzleBot
+                    document.getElementById('score-desc').innerText = "Перенаправляем в бот для разбора ошибок...";
+                    setTimeout(() => {
+                        tg.sendData("ПЛОХОЙ РЕЗУЛЬТАТ");
+                        tg.close();
+                    }, 2000);
+                } else {
+                    // Если всё отлично — просто хвалим прямо на экране Mini App
+                    document.getElementById('score-desc').innerText = "Великолепно! Ты настоящий эксперт и отлично знаешь химию процессов. Ждем тебя на продвинутых модулях!";
+                    tg.MainButton.setText("ЗАКРЫТЬ ТЕСТ");
+                    tg.MainButton.show();
+                    tg.onEvent('mainButtonClicked', () => tg.close());
+                }
+            }
+        });
+
+        loadQuestion();
+    </script>
+</body>
+</html>
